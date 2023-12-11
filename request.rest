@@ -1,0 +1,39 @@
+GET http://localhost:8000/users
+
+###
+
+POST http://localhost:8000/users
+Content-Type: application/json
+
+{
+    "name": "mario",
+    "email": "lima@gmail.com",
+    "password": "ada"
+}
+###
+POST http://localhost:8000/users/login
+Content-Type: application/json
+
+{
+    "email": "satu@gmail.com",
+    "password": "ada"
+}
+
+###
+DELETE http://localhost:8000/users/35
+
+###
+POST http://localhost:8000/users/forgot-password
+Content-Type: application/json
+
+{
+    "email": "okke@gmail.com"
+}
+
+###
+POST http://localhost:8000/users/reset-password/85391e07b57e45826f02e731028df960cd627d07
+Content-Type: application/json
+
+{
+    "newPassword": "kamu"
+}
