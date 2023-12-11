@@ -269,7 +269,7 @@ app.patch('/users/upload-image/:userId', async (req, res) => {
         return res.status(404).send('User not found');
     }
 
-    // Hapus gambar profil dari tabel user_images
+    // untuk remove user profile
     db.query('UPDATE user_images SET image_path = NULL WHERE user_id = ?', userId, (error, result) => {
         if (error) {
             console.log(error);
