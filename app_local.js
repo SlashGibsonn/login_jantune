@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const multer = require('multer');
+const { error } = require('console');
 
 dotenv.config({ path: './.env' });
 const app = express();
@@ -48,7 +49,7 @@ const fileStorageEngine = multer.diskStorage({
 const upload = multer({ storage: fileStorageEngine });
 
 app.get('/users', (req, res) => {
-    db.query('SELECT * FROM users', (error, result) => {
+    db.query('SELECT name,email FROM users', (error, result) => {
         if (error) {
             console.log(error);
             res.status(500).send('Internal Server Error');
@@ -72,6 +73,7 @@ app.post('/users', async (req, res) => {
                 name: req.body.name,
                 email: req.body.email,
                 password: hashedPassword,
+                phone_number: req.body.phone_number,
             };
 
             db.query('INSERT INTO users SET ?', newUser, (error, result) => {
@@ -212,7 +214,7 @@ async function getUserByResetToken(token) {
     });
 }
 
-app.put('/users/:userId/upload-image', upload.single('image'), async (req, res) => {
+app.put('/users/upload-image/:userId', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).send('No file uploaded.');
@@ -225,15 +227,10 @@ app.put('/users/:userId/upload-image', upload.single('image'), async (req, res) 
 
         if (!user) {
             return res.status(404).send('User not found');
-        }
-
-        // Memeriksa apakah pengguna sudah memiliki gambar profil
-        const existingImage = await getUserImageById(userId);
-
-        if (existingImage) {
+        }  if (user) {
             // Jika sudah ada, perbarui gambar profil
             const imagePath = req.file.path;
-            db.query('UPDATE user_images SET image_path = ? WHERE user_id = ?', [imagePath, userId], (error, result) => {
+            db.query('UPDATE users SET user_image = ? WHERE id = ?', [imagePath, userId], (error, result) => {
                 if (error) {
                     console.log(error);
                     res.status(500).send('Internal Server Error');
@@ -244,7 +241,7 @@ app.put('/users/:userId/upload-image', upload.single('image'), async (req, res) 
         } else {
             // Jika belum ada, tambahkan gambar profil baru
             const imagePath = req.file.path;
-            db.query('INSERT INTO user_images (user_id, image_path) VALUES (?, ?)', [userId, imagePath], (error, result) => {
+            db.query('INSERT INTO users (id, user_image) VALUES (?, ?)', [userId, imagePath], (error, result) => {
                 if (error) {
                     console.log(error);
                     res.status(500).send('Internal Server Error');
@@ -259,7 +256,7 @@ app.put('/users/:userId/upload-image', upload.single('image'), async (req, res) 
     }
 });
 
-app.patch('/users/upload-image/:userId', async (req, res) => {
+app.delete('/users/delete-image/:userId', async (req, res) => {
     const userId = req.params.userId;
 
     // Verifikasi apakah user dengan ID tersebut ada
@@ -270,7 +267,7 @@ app.patch('/users/upload-image/:userId', async (req, res) => {
     }
 
     // untuk remove profile user
-    db.query('UPDATE user_images SET image_path = NULL WHERE user_id = ?', userId, (error, result) => {
+    db.query('UPDATE users SET user_image = NULL WHERE id = ?', userId, (error, result) => {
         if (error) {
             console.log(error);
             res.status(500).send('Internal Server Error');
@@ -280,17 +277,87 @@ app.patch('/users/upload-image/:userId', async (req, res) => {
     });
 });
 
-async function getUserImageById(userId) {
-    return new Promise((resolve, reject) => {
-        db.query('SELECT * FROM user_images WHERE user_id = ?', userId, (error, results) => {
+app.put('/users/update-name/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const user = await getUserById(userId);
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+
+        const name = req.body.name;
+
+        if (!name) {
+            return res.status(400).send('Name cannot be null');
+        }
+
+        db.query('UPDATE users SET name = ? WHERE id = ?', [name, userId], (error, result) => {
             if (error) {
-                reject(error);
+                console.log(error);
+                res.status(500).send('Internal Server Error');
             } else {
-                resolve(results[0]);
+                res.send('Name updated');
             }
         });
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+app.put('/users/update-phone/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const user = await getUserById(userId);
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+
+        const phoneNumber = req.body.phone_number;
+        if (!/^\d+$/.test(phoneNumber)) {
+            return res.status(400).send('Invalid phone number. Only numeric characters are allowed.');
+        }
+
+        if (!phoneNumber) {
+            return res.status(400).send('Phone number cannot be null');
+        }
+
+        db.query('UPDATE users SET phone_number = ? WHERE id = ?', [phoneNumber, userId], (error, result) => {
+            if (error) {
+                console.log(error);
+                res.status(500).send('Internal Server Error');
+            } else {
+                res.send('Phone number updated');
+            }
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+app.delete('/users/delete-phone/:userId', async (req, res) => {
+    const userId = req.params.userId;
+
+    // Verifikasi apakah user dengan ID tersebut ada
+    const user = await getUserById(userId);
+
+    if (!user) {
+        return res.status(404).send('User not found');
+    }
+
+    // untuk remove phone_number isinya
+    db.query('UPDATE users SET phone_number = NULL WHERE id = ?', userId, (error, result) => {
+        if (error) {
+            console.log(error);
+            res.status(500).send('Internal Server Error');
+        } else {
+            res.send('Phone number removed');
+        }
     });
-}
+});
 
 async function getUserById(userId) {
     return new Promise((resolve, reject) => {
