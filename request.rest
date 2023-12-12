@@ -2,12 +2,16 @@ GET http://localhost:8000/users
 
 ###
 
+GET http://localhost:8000/users/47
+
+###
+
 POST http://localhost:8000/users
 Content-Type: application/json
 
 {
     "name": "mario",
-    "email": "lima@gmail.com",
+    "email": "satu@gmail.com",
     "password": "ada"
 }
 ###
@@ -20,14 +24,14 @@ Content-Type: application/json
 }
 
 ###
-DELETE http://localhost:8000/users/35
+DELETE http://localhost:8000/users/45
 
 ###
 POST http://localhost:8000/users/forgot-password
 Content-Type: application/json
 
 {
-    "email": "okke@gmail.com"
+    "email": "tiga@gmail.com"
 }
 
 ###
@@ -37,3 +41,8 @@ Content-Type: application/json
 {
     "newPassword": "kamu"
 }
+
+### 
+GET http://localhost:8000/protected-route
+Content-Type: application/json
+// sek engkok ae

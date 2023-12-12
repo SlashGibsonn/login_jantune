@@ -6,6 +6,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const multer = require('multer');
 const { error } = require('console');
+const jwt = require('jsonwebtoken');
 
 dotenv.config({ path: './.env' });
 const app = express();
@@ -36,6 +37,11 @@ db.connect((error) => {
 
 // nyoba array
 // const users = [];
+const JWT_SECRET = process.env.JWT_SECRET;
+
+function generateToken(userId) {
+    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '10m' });
+}
 
 const fileStorageEngine = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -48,12 +54,42 @@ const fileStorageEngine = multer.diskStorage({
 
 const upload = multer({ storage: fileStorageEngine });
 
+function verifyToken(req, res, next) {
+    const token = req.header('Authorization');
+
+    if (!token) {
+        return res.status(401).send('Access denied. No token provided.');
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+        if (err) {
+            console.error('Error verifying token:', err);
+            return res.status(401).send('Invalid token.');
+        }
+
+        req.userId = decoded.userId;
+        next();
+    });
+}
+
 app.get('/users', (req, res) => {
-    db.query('SELECT name,email FROM users', (error, result) => {
+    db.query('SELECT name,email,id FROM users', (error, result) => {
         if (error) {
             console.log(error);
             res.status(500).send('Internal Server Error');
         } else {
+            res.json(result);
+        }
+    });
+});
+
+app.get('/users/:userId', (req,res)=> {
+    const userId = req.params.userId;
+    db.query('SELECT name,email,id FROM users WHERE id = ?',userId, (error,result)=>{
+        if(error){
+            console.log(error);
+            res.status(500).send('Internal Server Error');
+        }else{
             res.json(result);
         }
     });
@@ -114,9 +150,11 @@ app.post('/users/login', async (req, res) => {
             const user = results[0];
             try {
                 if (await bcrypt.compare(req.body.password, user.password)) {
-                    res.send('sukses');
+                    // mbuat token JWT
+                    const token = generateToken(user.id);
+                    res.json({ token });
                 } else {
-                    res.send('gagal');
+                    res.status(401).send('Authentication failed');
                 }
             } catch (error) {
                 console.log(error);
@@ -127,8 +165,7 @@ app.post('/users/login', async (req, res) => {
         }
     });
 });
-
-app.delete('/users/:userId', (req, res) => {
+app.delete('/users/:userId', verifyToken,(req, res) => {
     const userId = req.params.userId;
 
     db.query('DELETE FROM users WHERE id = ?', userId, (error, result) => {
@@ -143,7 +180,7 @@ app.delete('/users/:userId', (req, res) => {
     });
 });
 
-app.post('/users/forgot-password', async (req, res) => {
+app.post('/users/forgot-password',verifyToken, async (req, res) => {
     const email = req.body.email;
 
     try {
@@ -174,7 +211,7 @@ app.post('/users/forgot-password', async (req, res) => {
 });
 
 
-app.post('/users/reset-password/:token', async (req, res) => {
+app.post('/users/reset-password/:token',verifyToken, async (req, res) => {
     const token = req.params.token;
     const newPassword = req.body.newPassword;
 
@@ -214,7 +251,7 @@ async function getUserByResetToken(token) {
     });
 }
 
-app.put('/users/upload-image/:userId', upload.single('image'), async (req, res) => {
+app.put('/users/upload-image/:userId', verifyToken,upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).send('No file uploaded.');
@@ -222,13 +259,13 @@ app.put('/users/upload-image/:userId', upload.single('image'), async (req, res) 
 
         const userId = req.params.userId;
 
-        // Verifikasi apakah user dengan ID tersebut ada
+        // Verifikasi apakah user dengan ID tersebut ada yaa
         const user = await getUserById(userId);
 
         if (!user) {
             return res.status(404).send('User not found');
         }  if (user) {
-            // Jika sudah ada, perbarui gambar profil
+            // Jika sudah ada, perbarui gambar profil kamu
             const imagePath = req.file.path;
             db.query('UPDATE users SET user_image = ? WHERE id = ?', [imagePath, userId], (error, result) => {
                 if (error) {
@@ -239,7 +276,7 @@ app.put('/users/upload-image/:userId', upload.single('image'), async (req, res) 
                 }
             });
         } else {
-            // Jika belum ada, tambahkan gambar profil baru
+            // Jika belum ada, tambahkan gambar profil baru 
             const imagePath = req.file.path;
             db.query('INSERT INTO users (id, user_image) VALUES (?, ?)', [userId, imagePath], (error, result) => {
                 if (error) {
@@ -256,7 +293,7 @@ app.put('/users/upload-image/:userId', upload.single('image'), async (req, res) 
     }
 });
 
-app.delete('/users/delete-image/:userId', async (req, res) => {
+app.delete('/users/delete-image/:userId', verifyToken,async (req, res) => {
     const userId = req.params.userId;
 
     // Verifikasi apakah user dengan ID tersebut ada
@@ -277,7 +314,7 @@ app.delete('/users/delete-image/:userId', async (req, res) => {
     });
 });
 
-app.put('/users/update-name/:userId', async (req, res) => {
+app.put('/users/update-name/:userId', verifyToken,async (req, res) => {
     try {
         const userId = req.params.userId;
         const user = await getUserById(userId);
@@ -306,7 +343,7 @@ app.put('/users/update-name/:userId', async (req, res) => {
     }
 });
 
-app.put('/users/update-phone/:userId', async (req, res) => {
+app.put('/users/update-phone/:userId', verifyToken,async (req, res) => {
     try {
         const userId = req.params.userId;
         const user = await getUserById(userId);
@@ -338,7 +375,7 @@ app.put('/users/update-phone/:userId', async (req, res) => {
     }
 });
 
-app.delete('/users/delete-phone/:userId', async (req, res) => {
+app.delete('/users/delete-phone/:userId', verifyToken,async (req, res) => {
     const userId = req.params.userId;
 
     // Verifikasi apakah user dengan ID tersebut ada
@@ -370,6 +407,11 @@ async function getUserById(userId) {
         });
     });
 }
+
+app.get('/protected-route', verifyToken, (req, res) => {
+    // If the token is valid, this route handler will be executed
+    res.send('You have access to the protected route.');
+});
 
 process.on('SIGINT', () => {
     db.end((err) => {
