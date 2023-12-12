@@ -11,7 +11,7 @@ Content-Type: application/json
 
 {
     "name": "mario",
-    "email": "satu@gmail.com",
+    "email": "dua@gmail.com",
     "password": "ada"
 }
 ###
@@ -19,8 +19,8 @@ POST http://localhost:8000/users/login
 Content-Type: application/json
 
 {
-    "email": "satu@gmail.com",
-    "password": "ada"
+    "email": "dua@gmail.com",
+    "password": "kamu"
 }
 
 ###
@@ -45,4 +45,4 @@ Content-Type: application/json
 ### 
 GET http://localhost:8000/protected-route
 Content-Type: application/json
-// sek engkok ae
+// nyoba di postman aja ini gk ribet

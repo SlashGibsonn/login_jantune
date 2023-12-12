@@ -40,7 +40,7 @@ db.connect((error) => {
 const JWT_SECRET = process.env.JWT_SECRET;
 
 function generateToken(userId) {
-    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '10m' });
+    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '5m' });
 }
 
 const fileStorageEngine = multer.diskStorage({
@@ -251,42 +251,56 @@ async function getUserByResetToken(token) {
     });
 }
 
-app.put('/users/upload-image/:userId', verifyToken,upload.single('image'), async (req, res) => {
+app.put('/users/update-profile/:userId', verifyToken, upload.single('image'), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).send('No file uploaded.');
-        }
-
         const userId = req.params.userId;
-
-        // Verifikasi apakah user dengan ID tersebut ada yaa
         const user = await getUserById(userId);
 
         if (!user) {
             return res.status(404).send('User not found');
-        }  if (user) {
-            // Jika sudah ada, perbarui gambar profil kamu
+        }
+
+        const name = req.body.name;
+        const phoneNumber = req.body.phone_number;
+
+        // Handle image uploadd
+        if (req.file) {
             const imagePath = req.file.path;
             db.query('UPDATE users SET user_image = ? WHERE id = ?', [imagePath, userId], (error, result) => {
                 if (error) {
                     console.log(error);
                     res.status(500).send('Internal Server Error');
-                } else {
-                    res.send('Profile image updated');
-                }
-            });
-        } else {
-            // Jika belum ada, tambahkan gambar profil baru 
-            const imagePath = req.file.path;
-            db.query('INSERT INTO users (id, user_image) VALUES (?, ?)', [userId, imagePath], (error, result) => {
-                if (error) {
-                    console.log(error);
-                    res.status(500).send('Internal Server Error');
-                } else {
-                    res.send('Profile image uploaded');
+                    return;
                 }
             });
         }
+
+        // Handle name update
+        if (name) {
+            db.query('UPDATE users SET name = ? WHERE id = ?', [name, userId], (error, result) => {
+                if (error) {
+                    console.log(error);
+                    res.status(500).send('Internal Server Error');
+                    return;
+                }
+            });
+        }
+
+        // Handle phone number update
+        if (phoneNumber) {
+            if (!/^\d+$/.test(phoneNumber)) {
+                return res.status(400).send('Invalid phone number. Only numeric characters are allowed.');
+            }
+            db.query('UPDATE users SET phone_number = ? WHERE id = ?', [phoneNumber, userId], (error, result) => {
+                if (error) {
+                    console.log(error);
+                    res.status(500).send('Internal Server Error');
+                    return;
+                }
+            });
+        }
+
+        res.send('Profile updated');
     } catch (error) {
         console.log(error);
         res.status(500).send('Internal Server Error');
@@ -312,67 +326,6 @@ app.delete('/users/delete-image/:userId', verifyToken,async (req, res) => {
             res.send('Profile image removed');
         }
     });
-});
-
-app.put('/users/update-name/:userId', verifyToken,async (req, res) => {
-    try {
-        const userId = req.params.userId;
-        const user = await getUserById(userId);
-
-        if (!user) {
-            return res.status(404).send('User not found');
-        }
-
-        const name = req.body.name;
-
-        if (!name) {
-            return res.status(400).send('Name cannot be null');
-        }
-
-        db.query('UPDATE users SET name = ? WHERE id = ?', [name, userId], (error, result) => {
-            if (error) {
-                console.log(error);
-                res.status(500).send('Internal Server Error');
-            } else {
-                res.send('Name updated');
-            }
-        });
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-app.put('/users/update-phone/:userId', verifyToken,async (req, res) => {
-    try {
-        const userId = req.params.userId;
-        const user = await getUserById(userId);
-
-        if (!user) {
-            return res.status(404).send('User not found');
-        }
-
-        const phoneNumber = req.body.phone_number;
-        if (!/^\d+$/.test(phoneNumber)) {
-            return res.status(400).send('Invalid phone number. Only numeric characters are allowed.');
-        }
-
-        if (!phoneNumber) {
-            return res.status(400).send('Phone number cannot be null');
-        }
-
-        db.query('UPDATE users SET phone_number = ? WHERE id = ?', [phoneNumber, userId], (error, result) => {
-            if (error) {
-                console.log(error);
-                res.status(500).send('Internal Server Error');
-            } else {
-                res.send('Phone number updated');
-            }
-        });
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('Internal Server Error');
-    }
 });
 
 app.delete('/users/delete-phone/:userId', verifyToken,async (req, res) => {
